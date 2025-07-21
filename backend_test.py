@@ -261,7 +261,11 @@ class SpotifyAPITester:
                 if method == "GET":
                     response = self.session.get(f"{BASE_URL}{endpoint}?access_token={MOCK_ACCESS_TOKEN}")
                 else:
-                    response = self.session.post(f"{BASE_URL}{endpoint}&access_token={MOCK_ACCESS_TOKEN}")
+                    # For POST endpoints, add access_token as query parameter
+                    if "?" in endpoint:
+                        response = self.session.post(f"{BASE_URL}{endpoint}&access_token={MOCK_ACCESS_TOKEN}")
+                    else:
+                        response = self.session.post(f"{BASE_URL}{endpoint}?access_token={MOCK_ACCESS_TOKEN}")
                 
                 # Most should return 400/401 for invalid token, but playback state might return empty state
                 if endpoint == "/playback/state" and response.status_code == 200:
