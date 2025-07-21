@@ -1,4 +1,4 @@
-# hello iam mohammed  and its my first functional site and its made using pyton and tailwind css and html and ofcourse Spotify’s api
+# hello iam mohammed  and its my first functional site and its made using pyton and tailwind css and html and javascirpt and ofcourse Spotify’s api
 
 
 ### 🎵 **Core Features:**
