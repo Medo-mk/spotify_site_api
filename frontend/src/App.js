@@ -1,53 +1,579 @@
-import { useEffect } from "react";
-import "./App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { useState, useEffect } from 'react';
+import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const Home = () => {
-  const helloWorldApi = async () => {
+// Context for managing auth state
+const AuthContext = React.createContext();
+
+// Auth Provider Component
+const AuthProvider = ({ children }) => {
+  const [accessToken, setAccessToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for stored token
+    const storedToken = localStorage.getItem('spotify_access_token');
+    if (storedToken) {
+      setAccessToken(storedToken);
+      fetchUserProfile(storedToken);
+    } else {
+      // Check for auth callback
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      if (code) {
+        handleAuthCallback(code);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  const handleAuthCallback = async (code) => {
     try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+      const response = await fetch(`${API}/auth/callback?code=${code}`);
+      const data = await response.json();
+      
+      if (data.access_token) {
+        setAccessToken(data.access_token);
+        localStorage.setItem('spotify_access_token', data.access_token);
+        localStorage.setItem('spotify_refresh_token', data.refresh_token);
+        
+        await fetchUserProfile(data.access_token);
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, '/');
+      }
+    } catch (error) {
+      console.error('Auth callback error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  const fetchUserProfile = async (token) => {
+    try {
+      const response = await fetch(`${API}/user/profile?access_token=${token}`);
+      if (response.ok) {
+        const profile = await response.json();
+        setUser(profile);
+      }
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+    }
+  };
+
+  const login = async () => {
+    try {
+      const response = await fetch(`${API}/auth/login`);
+      const data = await response.json();
+      window.location.href = data.auth_url;
+    } catch (error) {
+      console.error('Login error:', error);
+    }
+  };
+
+  const logout = () => {
+    setAccessToken(null);
+    setUser(null);
+    localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem('spotify_refresh_token');
+  };
 
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
+    <AuthContext.Provider value={{ accessToken, user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook to use auth context
+const useAuth = () => {
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+// Login Component
+const LoginScreen = () => {
+  const { login } = useAuth();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-black to-green-800 flex items-center justify-center">
+      <div className="max-w-md w-full mx-4 p-8 bg-black/50 backdrop-blur-lg rounded-2xl border border-green-500/20">
+        <div className="text-center">
+          <div className="mb-8">
+            <div className="w-20 h-20 mx-auto mb-4 bg-green-500 rounded-full flex items-center justify-center">
+              <svg className="w-10 h-10 text-black" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.062 14.615c-.156.25-.469.328-.719.172-1.969-1.203-4.469-1.484-7.406-.812-.281.062-.562-.125-.625-.406s.125-.562.406-.625c3.25-.75 6.016-.422 8.172.953.25.156.328.469.172.718zm1.031-2.297c-.203.312-.625.406-.937.203-2.25-1.406-5.687-1.812-8.344-1-.312.094-.656-.125-.75-.437s.125-.656.437-.75c3.063-.937 6.937-.484 9.375 1.047.313.203.407.625.204.937zm.094-2.406C14.594 10.547 9.5 10.281 6.281 11.281c-.375.125-.781-.078-.906-.453s.078-.781.453-.906C9.219 9.594 14.844 9.906 18.406 11.719c.344.203.453.656.25 1s-.656.453-1 .25z"/>
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Spotify Music Hub</h1>
+            <p className="text-green-400">Your personal music discovery & analytics dashboard</p>
+          </div>
+          
+          <div className="space-y-4 mb-8">
+            <div className="flex items-center text-sm text-gray-300">
+              <svg className="w-4 h-4 mr-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Music search & discovery
+            </div>
+            <div className="flex items-center text-sm text-gray-300">
+              <svg className="w-4 h-4 mr-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Personal music analytics
+            </div>
+            <div className="flex items-center text-sm text-gray-300">
+              <svg className="w-4 h-4 mr-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Playlists & recommendations
+            </div>
+            <div className="flex items-center text-sm text-gray-300">
+              <svg className="w-4 h-4 mr-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Social music sharing
+            </div>
+          </div>
+
+          <button
+            onClick={login}
+            className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold py-3 px-6 rounded-full transition-all duration-200 transform hover:scale-105 flex items-center justify-center"
+          >
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.062 14.615c-.156.25-.469.328-.719.172-1.969-1.203-4.469-1.484-7.406-.812-.281.062-.562-.125-.625-.406s.125-.562.406-.625c3.25-.75 6.016-.422 8.172.953.25.156.328.469.172.718zm1.031-2.297c-.203.312-.625.406-.937.203-2.25-1.406-5.687-1.812-8.344-1-.312.094-.656-.125-.75-.437s.125-.656.437-.75c3.063-.937 6.937-.484 9.375 1.047.313.203.407.625.204.937zm.094-2.406C14.594 10.547 9.5 10.281 6.281 11.281c-.375.125-.781-.078-.906-.453s.078-.781.453-.906C9.219 9.594 14.844 9.906 18.406 11.719c.344.203.453.656.25 1s-.656.453-1 .25z"/>
+            </svg>
+            Connect with Spotify
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
+// Search Component
+const SearchSection = () => {
+  const { accessToken } = useAuth();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(null);
+  const [searchType, setSearchType] = useState('track');
+  const [loading, setLoading] = useState(false);
+
+  const searchMusic = async () => {
+    if (!query.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API}/search?q=${encodeURIComponent(query)}&type=${searchType}&limit=20&access_token=${accessToken}`
+      );
+      const data = await response.json();
+      setResults(data);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderTrackResults = (tracks) => (
+    <div className="grid gap-4">
+      {tracks.map((track) => (
+        <div key={track.id} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition-colors">
+          <div className="flex items-center space-x-4">
+            {track.album.images[0] && (
+              <img 
+                src={track.album.images[0].url} 
+                alt={track.name}
+                className="w-16 h-16 rounded-lg object-cover"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-medium truncate">{track.name}</h3>
+              <p className="text-gray-400 text-sm truncate">
+                {track.artists.map(a => a.name).join(', ')}
+              </p>
+              <p className="text-gray-500 text-xs">{track.album.name}</p>
+              <div className="flex items-center mt-2 space-x-4">
+                <span className="text-xs text-gray-500">
+                  {Math.floor(track.duration_ms / 60000)}:{String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}
+                </span>
+                <span className="text-xs text-green-400">♫ {track.popularity}%</span>
+              </div>
+            </div>
+            {track.preview_url && (
+              <audio controls className="w-32">
+                <source src={track.preview_url} type="audio/mpeg" />
+              </audio>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="bg-gray-900 p-6 rounded-xl">
+      <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+        <svg className="w-6 h-6 mr-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        Music Discovery
+      </h2>
+      
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for music, artists, albums..."
+            className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+            onKeyPress={(e) => e.key === 'Enter' && searchMusic()}
+          />
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value)}
+            className="px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-green-500 focus:outline-none"
+          >
+            <option value="track">Tracks</option>
+            <option value="artist">Artists</option>
+            <option value="album">Albums</option>
+            <option value="playlist">Playlists</option>
+          </select>
+          <button
+            onClick={searchMusic}
+            disabled={loading}
+            className="px-6 py-3 bg-green-500 hover:bg-green-600 text-black font-medium rounded-lg transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+      </div>
+
+      {results && (
+        <div className="mt-6">
+          {searchType === 'track' && results.tracks && renderTrackResults(results.tracks.items)}
+          {searchType === 'artist' && results.artists && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {results.artists.items.map((artist) => (
+                <div key={artist.id} className="bg-gray-800 p-4 rounded-lg text-center hover:bg-gray-700 transition-colors">
+                  {artist.images[0] && (
+                    <img 
+                      src={artist.images[0].url} 
+                      alt={artist.name}
+                      className="w-full h-32 object-cover rounded-lg mb-3"
+                    />
+                  )}
+                  <h3 className="text-white font-medium truncate">{artist.name}</h3>
+                  <p className="text-green-400 text-sm">{artist.followers.total.toLocaleString()} followers</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// User Dashboard Component
+const UserDashboard = () => {
+  const { user, accessToken } = useAuth();
+  const [topTracks, setTopTracks] = useState([]);
+  const [topArtists, setTopArtists] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+  const [recentTracks, setRecentTracks] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [timeRange, setTimeRange] = useState('medium_term');
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchDashboardData();
+    }
+  }, [accessToken, timeRange]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [topTracksRes, topArtistsRes, playlistsRes, recentRes, analyticsRes] = await Promise.all([
+        fetch(`${API}/user/top-tracks?time_range=${timeRange}&limit=10&access_token=${accessToken}`),
+        fetch(`${API}/user/top-artists?time_range=${timeRange}&limit=8&access_token=${accessToken}`),
+        fetch(`${API}/user/playlists?limit=8&access_token=${accessToken}`),
+        fetch(`${API}/user/recently-played?limit=10&access_token=${accessToken}`),
+        fetch(`${API}/analytics/listening-stats?access_token=${accessToken}`)
+      ]);
+
+      const [topTracksData, topArtistsData, playlistsData, recentData, analyticsData] = await Promise.all([
+        topTracksRes.json(),
+        topArtistsRes.json(),
+        playlistsRes.json(),
+        recentRes.json(),
+        analyticsRes.json()
+      ]);
+
+      setTopTracks(topTracksData.items || []);
+      setTopArtists(topArtistsData.items || []);
+      setPlaylists(playlistsData.items || []);
+      setRecentTracks(recentData.items || []);
+      setAnalytics(analyticsData);
+    } catch (error) {
+      console.error('Dashboard fetch error:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* User Profile Header */}
+      <div className="bg-gradient-to-r from-green-600 to-green-800 p-6 rounded-xl text-white">
+        <div className="flex items-center space-x-6">
+          {user.images && user.images[0] && (
+            <img 
+              src={user.images[0].url} 
+              alt={user.display_name}
+              className="w-20 h-20 rounded-full border-4 border-white/20"
+            />
+          )}
+          <div>
+            <h1 className="text-3xl font-bold">{user.display_name}</h1>
+            <div className="flex items-center space-x-4 mt-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                user.is_premium ? 'bg-yellow-500 text-black' : 'bg-gray-600 text-white'
+              }`}>
+                {user.is_premium ? 'Premium' : 'Free'}
+              </span>
+              <span className="text-green-200">{user.followers} followers</span>
+              <span className="text-green-200">{user.country}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Analytics Summary */}
+        {analytics && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/20">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{analytics.stats.total_unique_artists}</div>
+              <div className="text-sm text-green-200">Artists</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">{analytics.stats.total_genres}</div>
+              <div className="text-sm text-green-200">Genres</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">{analytics.stats.tracks_analyzed}</div>
+              <div className="text-sm text-green-200">Top Tracks</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">{recentTracks.length}</div>
+              <div className="text-sm text-green-200">Recent Plays</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Time Range Selector */}
+      <div className="flex justify-center">
+        <div className="bg-gray-800 p-1 rounded-lg">
+          {[
+            { value: 'short_term', label: '4 Weeks' },
+            { value: 'medium_term', label: '6 Months' },
+            { value: 'long_term', label: 'All Time' }
+          ].map((range) => (
+            <button
+              key={range.value}
+              onClick={() => setTimeRange(range.value)}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                timeRange === range.value 
+                  ? 'bg-green-500 text-black' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Top Tracks */}
+        <div className="bg-gray-900 p-6 rounded-xl">
+          <h2 className="text-xl font-bold text-white mb-4">Your Top Tracks</h2>
+          <div className="space-y-3">
+            {topTracks.slice(0, 5).map((track, index) => (
+              <div key={track.id} className="flex items-center space-x-3">
+                <span className="text-green-400 font-bold text-lg w-6">{index + 1}</span>
+                {track.album.images[0] && (
+                  <img 
+                    src={track.album.images[0].url} 
+                    alt={track.name}
+                    className="w-12 h-12 rounded-lg"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">{track.name}</p>
+                  <p className="text-gray-400 text-sm truncate">
+                    {track.artists.map(a => a.name).join(', ')}
+                  </p>
+                </div>
+                <div className="text-green-400 text-sm">♫ {track.popularity}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Top Artists */}
+        <div className="bg-gray-900 p-6 rounded-xl">
+          <h2 className="text-xl font-bold text-white mb-4">Your Top Artists</h2>
+          <div className="space-y-3">
+            {topArtists.slice(0, 5).map((artist, index) => (
+              <div key={artist.id} className="flex items-center space-x-3">
+                <span className="text-green-400 font-bold text-lg w-6">{index + 1}</span>
+                {artist.images[0] && (
+                  <img 
+                    src={artist.images[0].url} 
+                    alt={artist.name}
+                    className="w-12 h-12 rounded-full"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">{artist.name}</p>
+                  <p className="text-gray-400 text-sm">
+                    {artist.followers.total.toLocaleString()} followers
+                  </p>
+                </div>
+                <div className="text-green-400 text-sm">♫ {artist.popularity}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Playlists */}
+      <div className="bg-gray-900 p-6 rounded-xl">
+        <h2 className="text-xl font-bold text-white mb-4">Your Playlists</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {playlists.slice(0, 6).map((playlist) => (
+            <div key={playlist.id} className="bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
+              {playlist.images[0] && (
+                <img 
+                  src={playlist.images[0].url} 
+                  alt={playlist.name}
+                  className="w-full h-24 object-cover rounded-lg mb-2"
+                />
+              )}
+              <h3 className="text-white text-sm font-medium truncate">{playlist.name}</h3>
+              <p className="text-gray-400 text-xs">{playlist.tracks.total} tracks</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main App Component
+const SpotifyMusicHub = () => {
+  const { user, loading } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const navigation = [
+    { id: 'dashboard', name: 'Dashboard', icon: '🏠' },
+    { id: 'search', name: 'Discover', icon: '🔍' },
+    { id: 'playlists', name: 'Playlists', icon: '🎵' },
+    { id: 'analytics', name: 'Analytics', icon: '📊' }
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Loading your music...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <div className="min-h-screen bg-black">
+      {/* Navigation */}
+      <nav className="bg-gray-900 border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-8">
+              <h1 className="text-xl font-bold text-white">Spotify Hub</h1>
+              <div className="flex space-x-1">
+                {navigation.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      activeTab === item.id
+                        ? 'bg-green-500 text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="mr-2">{item.icon}</span>
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-400">Welcome, {user.display_name}</span>
+              <button 
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {activeTab === 'dashboard' && <UserDashboard />}
+        {activeTab === 'search' && <SearchSection />}
+        {activeTab === 'playlists' && (
+          <div className="text-center text-white">
+            <h2 className="text-2xl font-bold mb-4">Playlists Feature</h2>
+            <p>Detailed playlist management coming soon!</p>
+          </div>
+        )}
+        {activeTab === 'analytics' && (
+          <div className="text-center text-white">
+            <h2 className="text-2xl font-bold mb-4">Advanced Analytics</h2>
+            <p>Deep music analytics and insights coming soon!</p>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+// Main App with Auth Provider
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <AuthProvider>
+      <SpotifyMusicHub />
+    </AuthProvider>
   );
 }
 
