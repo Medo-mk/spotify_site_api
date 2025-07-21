@@ -69,17 +69,24 @@ class SpotifyAPITester:
                 self.log_result("Root endpoint connectivity", False, f"Status: {response.status_code}", response.text)
                 
             # Test CORS headers
-            cors_headers = {
-                'Access-Control-Allow-Origin',
-                'Access-Control-Allow-Methods', 
-                'Access-Control-Allow-Headers'
-            }
+            cors_headers = [
+                'access-control-allow-origin',
+                'access-control-allow-credentials'
+            ]
             
-            found_cors = any(header.lower().replace('-', '_') in [h.lower().replace('-', '_') for h in response.headers] for header in cors_headers)
-            if found_cors or response.headers.get('access-control-allow-origin'):
+            found_cors = any(header in response.headers for header in cors_headers)
+            if found_cors:
                 self.log_result("CORS headers present", True, "CORS middleware configured")
             else:
-                self.log_result("CORS headers present", False, "No CORS headers found", dict(response.headers))
+                # Try OPTIONS request to check CORS
+                try:
+                    options_response = self.session.options(f"{BASE_URL}/", headers={'Origin': 'http://localhost:3000'})
+                    if any(header in options_response.headers for header in cors_headers):
+                        self.log_result("CORS headers present", True, "CORS middleware configured (via OPTIONS)")
+                    else:
+                        self.log_result("CORS headers present", False, "No CORS headers found", dict(options_response.headers))
+                except:
+                    self.log_result("CORS headers present", False, "No CORS headers found", dict(response.headers))
                 
         except requests.exceptions.RequestException as e:
             self.log_result("Root endpoint connectivity", False, f"Connection error: {str(e)}")
