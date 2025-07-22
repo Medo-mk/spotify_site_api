@@ -27,6 +27,200 @@ const loadSpotifySDK = () => {
 // Context for managing auth state
 const AuthContext = React.createContext();
 
+// Context for managing player state
+const PlayerContext = React.createContext();
+
+// Player Provider Component
+const PlayerProvider = ({ children }) => {
+  const [player, setPlayer] = useState(null);
+  const [isActive, setIsActive] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const [deviceId, setDeviceId] = useState(null);
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [queue, setQueue] = useState([]);
+
+  const initializePlayer = async (accessToken) => {
+    try {
+      const spotifySDK = await loadSpotifySDK();
+      
+      const spotifyPlayer = new spotifySDK.Player({
+        name: 'Spotify Music Hub Player',
+        getOAuthToken: (cb) => cb(accessToken),
+        volume: 0.5,
+      });
+
+      // Error handling
+      spotifyPlayer.addListener('initialization_error', ({ message }) => {
+        console.error('Spotify Player initialization error:', message);
+      });
+
+      spotifyPlayer.addListener('authentication_error', ({ message }) => {
+        console.error('Spotify Player authentication error:', message);
+      });
+
+      spotifyPlayer.addListener('account_error', ({ message }) => {
+        console.error('Spotify Player account error:', message);
+      });
+
+      spotifyPlayer.addListener('playback_error', ({ message }) => {
+        console.error('Spotify Player playback error:', message);
+      });
+
+      // Playback status updates
+      spotifyPlayer.addListener('player_state_changed', (state) => {
+        if (!state) return;
+
+        setCurrentTrack(state.track_window.current_track);
+        setIsPaused(state.paused);
+        setPosition(state.position);
+        setDuration(state.duration);
+        
+        // Update queue
+        const nextTracks = state.track_window.next_tracks || [];
+        const previousTracks = state.track_window.previous_tracks || [];
+        setQueue([...previousTracks.reverse(), state.track_window.current_track, ...nextTracks]);
+      });
+
+      // Ready
+      spotifyPlayer.addListener('ready', ({ device_id }) => {
+        console.log('Spotify Player ready with Device ID', device_id);
+        setDeviceId(device_id);
+        setIsActive(true);
+      });
+
+      // Not Ready
+      spotifyPlayer.addListener('not_ready', ({ device_id }) => {
+        console.log('Spotify Player has gone offline', device_id);
+        setIsActive(false);
+      });
+
+      // Connect to the player!
+      await spotifyPlayer.connect();
+      setPlayer(spotifyPlayer);
+      
+    } catch (error) {
+      console.error('Error initializing Spotify player:', error);
+    }
+  };
+
+  const play = async () => {
+    if (player) {
+      await player.resume();
+    }
+  };
+
+  const pause = async () => {
+    if (player) {
+      await player.pause();
+    }
+  };
+
+  const skipToNext = async () => {
+    if (player) {
+      await player.nextTrack();
+    }
+  };
+
+  const skipToPrevious = async () => {
+    if (player) {
+      await player.previousTrack();
+    }
+  };
+
+  const seek = async (positionMs) => {
+    if (player) {
+      await player.seek(positionMs);
+      setPosition(positionMs);
+    }
+  };
+
+  const setPlayerVolume = async (vol) => {
+    if (player) {
+      await player.setVolume(vol);
+      setVolume(vol);
+    }
+  };
+
+  const playTrack = async (trackUri, accessToken) => {
+    if (!deviceId || !accessToken) return;
+    
+    try {
+      await fetch(`${API}/playback/play?access_token=${accessToken}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          track_uri: trackUri,
+          device_id: deviceId,
+        }),
+      });
+    } catch (error) {
+      console.error('Error playing track:', error);
+    }
+  };
+
+  const transferPlayback = async (accessToken) => {
+    if (!deviceId || !accessToken) return;
+    
+    try {
+      await fetch(`https://api.spotify.com/v1/me/player`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          device_ids: [deviceId],
+          play: false,
+        }),
+      });
+    } catch (error) {
+      console.error('Error transferring playback:', error);
+    }
+  };
+
+  return (
+    <PlayerContext.Provider value={{
+      player,
+      isActive,
+      isPaused,
+      currentTrack,
+      position,
+      duration,
+      volume,
+      deviceId,
+      isPlayerExpanded,
+      setIsPlayerExpanded,
+      queue,
+      initializePlayer,
+      play,
+      pause,
+      skipToNext,
+      skipToPrevious,
+      seek,
+      setPlayerVolume,
+      playTrack,
+      transferPlayback,
+    }}>
+      {children}
+    </PlayerContext.Provider>
+  );
+};
+
+// Custom hook to use player context
+const usePlayer = () => {
+  const context = React.useContext(PlayerContext);
+  if (!context) {
+    throw new Error('usePlayer must be used within PlayerProvider');
+  }
+  return context;
+};
+
 // Auth Provider Component
 const AuthProvider = ({ children }) => {
   const [accessToken, setAccessToken] = useState(null);
