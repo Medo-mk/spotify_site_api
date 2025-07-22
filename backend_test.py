@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://beb5641d-1a45-4e36-8052-d80836d27428.preview.emergentagent.com/api"
+BASE_URL = "https://c59ff13f-bf73-4813-a770-a3099a636bc5.preview.emergentagent.com/api"
 MOCK_ACCESS_TOKEN = "mock_spotify_token_for_testing"
 INVALID_TOKEN = "invalid_token_123"
 
