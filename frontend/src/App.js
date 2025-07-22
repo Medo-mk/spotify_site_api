@@ -320,7 +320,193 @@ const useAuth = () => {
   return context;
 };
 
-// Login Component
+// Bottom Player Bar Component
+const BottomPlayerBar = () => {
+  const { accessToken } = useAuth();
+  const { 
+    isActive, 
+    isPaused, 
+    currentTrack, 
+    position, 
+    duration, 
+    volume,
+    isPlayerExpanded,
+    setIsPlayerExpanded,
+    play, 
+    pause, 
+    skipToNext, 
+    skipToPrevious, 
+    seek, 
+    setPlayerVolume 
+  } = usePlayer();
+
+  const [localPosition, setLocalPosition] = useState(position);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalPosition(position);
+    }
+  }, [position, isDragging]);
+
+  // Progress update interval
+  useEffect(() => {
+    if (!isPaused && isActive && !isDragging) {
+      const interval = setInterval(() => {
+        setLocalPosition(prev => Math.min(prev + 1000, duration));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isPaused, isActive, isDragging, duration]);
+
+  const formatTime = (ms) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleSeek = (value) => {
+    const newPosition = (value / 100) * duration;
+    setLocalPosition(newPosition);
+    if (!isDragging) {
+      seek(newPosition);
+    }
+  };
+
+  const handleSeekStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleSeekEnd = () => {
+    setIsDragging(false);
+    seek(localPosition);
+  };
+
+  if (!isActive || !currentTrack) {
+    return null;
+  }
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 z-50">
+      {/* Progress Bar */}
+      <div className="w-full bg-gray-700 h-1 cursor-pointer group" 
+           onClick={(e) => {
+             const rect = e.currentTarget.getBoundingClientRect();
+             const x = e.clientX - rect.left;
+             const percentage = (x / rect.width) * 100;
+             handleSeek(percentage);
+           }}>
+        <div 
+          className="bg-green-500 h-1 transition-all duration-100 group-hover:bg-green-400"
+          style={{ width: `${duration > 0 ? (localPosition / duration) * 100 : 0}%` }}
+        />
+      </div>
+
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          {/* Track Info */}
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
+            <img 
+              src={currentTrack.album.images[0]?.url} 
+              alt={currentTrack.name}
+              className="w-14 h-14 rounded-lg object-cover cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => setIsPlayerExpanded(!isPlayerExpanded)}
+            />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-white font-medium truncate cursor-pointer hover:underline"
+                  onClick={() => setIsPlayerExpanded(!isPlayerExpanded)}>
+                {currentTrack.name}
+              </h3>
+              <p className="text-gray-400 text-sm truncate">
+                {currentTrack.artists.map(a => a.name).join(', ')}
+              </p>
+            </div>
+          </div>
+
+          {/* Player Controls */}
+          <div className="flex items-center space-x-4">
+            <span className="text-xs text-gray-400 w-10 text-right">
+              {formatTime(localPosition)}
+            </span>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={skipToPrevious}
+                className="text-gray-400 hover:text-white transition-colors"
+                title="Previous track"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+
+              <button
+                onClick={isPaused ? play : pause}
+                className="bg-green-500 hover:bg-green-600 text-black rounded-full p-2 transition-colors"
+                title={isPaused ? 'Play' : 'Pause'}
+              >
+                {isPaused ? (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+
+              <button
+                onClick={skipToNext}
+                className="text-gray-400 hover:text-white transition-colors"
+                title="Next track"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414zm6 0a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L14.586 10l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            <span className="text-xs text-gray-400 w-10">
+              {formatTime(duration)}
+            </span>
+
+            {/* Volume Control */}
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.774L4.724 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.724l3.659-3.774a1 1 0 011.617.774zM10 7.22l-1.659 1.711A1 1 0 017.724 9H3v2h4.724a1 1 0 01.617.089L10 12.78V7.22zm4.757-1.757a1 1 0 011.415 0A8 8 0 0118 12a8 8 0 01-1.828 5.123 1 1 0 01-1.415-1.414A6 6 0 0016 12a6 6 0 00-1.243-3.709 1 1 0 010-1.414zM14.5 7.757a1 1 0 011.414 0A4 4 0 0117 12a4 4 0 01-1.086 2.743 1 1 0 11-1.414-1.486A2 2 0 0015 12a2 2 0 00-.5-1.314 1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) => setPlayerVolume(parseFloat(e.target.value))}
+                className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #10b981 0%, #10b981 ${volume * 100}%, #374151 ${volume * 100}%, #374151 100%)`
+                }}
+              />
+            </div>
+
+            {/* Expand Button */}
+            <button
+              onClick={() => setIsPlayerExpanded(!isPlayerExpanded)}
+              className="text-gray-400 hover:text-white transition-colors"
+              title={isPlayerExpanded ? 'Minimize player' : 'Expand player'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d={isPlayerExpanded ? "m19 9-7 7-7-7" : "m5 15 7-7 7 7"} />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 const LoginScreen = () => {
   const { login } = useAuth();
 
