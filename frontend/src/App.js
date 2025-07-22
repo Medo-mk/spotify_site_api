@@ -226,6 +226,7 @@ const AuthProvider = ({ children }) => {
   const [accessToken, setAccessToken] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { initializePlayer, transferPlayback } = usePlayer();
 
   useEffect(() => {
     // Check for stored token
@@ -233,6 +234,7 @@ const AuthProvider = ({ children }) => {
     if (storedToken) {
       setAccessToken(storedToken);
       fetchUserProfile(storedToken);
+      initializePlayer(storedToken);
     } else {
       // Check for auth callback
       const urlParams = new URLSearchParams(window.location.search);
@@ -256,6 +258,12 @@ const AuthProvider = ({ children }) => {
         localStorage.setItem('spotify_refresh_token', data.refresh_token);
         
         await fetchUserProfile(data.access_token);
+        await initializePlayer(data.access_token);
+        
+        // Transfer playback to web player after short delay
+        setTimeout(() => {
+          transferPlayback(data.access_token);
+        }, 2000);
         
         // Clean up URL
         window.history.replaceState({}, document.title, '/');
