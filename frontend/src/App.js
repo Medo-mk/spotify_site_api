@@ -764,6 +764,7 @@ const LoginScreen = () => {
 // Search Component
 const SearchSection = () => {
   const { accessToken } = useAuth();
+  const { playTrack } = usePlayer();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [searchType, setSearchType] = useState('track');
@@ -786,17 +787,32 @@ const SearchSection = () => {
     }
   };
 
+  const handlePlayTrack = async (trackUri) => {
+    await playTrack(trackUri, accessToken);
+  };
+
   const renderTrackResults = (tracks) => (
     <div className="grid gap-4">
       {tracks.map((track) => (
-        <div key={track.id} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition-colors">
+        <div key={track.id} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition-colors group">
           <div className="flex items-center space-x-4">
             {track.album.images[0] && (
-              <img 
-                src={track.album.images[0].url} 
-                alt={track.name}
-                className="w-16 h-16 rounded-lg object-cover"
-              />
+              <div className="relative">
+                <img 
+                  src={track.album.images[0].url} 
+                  alt={track.name}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <button
+                  onClick={() => handlePlayTrack(track.uri)}
+                  className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  title={`Play ${track.name}`}
+                >
+                  <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             )}
             <div className="flex-1 min-w-0">
               <h3 className="text-white font-medium truncate">{track.name}</h3>
@@ -811,11 +827,22 @@ const SearchSection = () => {
                 <span className="text-xs text-green-400">♫ {track.popularity}%</span>
               </div>
             </div>
-            {track.preview_url && (
-              <audio controls className="w-32">
-                <source src={track.preview_url} type="audio/mpeg" />
-              </audio>
-            )}
+            <div className="flex items-center space-x-2">
+              {track.preview_url && (
+                <audio controls className="w-32">
+                  <source src={track.preview_url} type="audio/mpeg" />
+                </audio>
+              )}
+              <button
+                onClick={() => handlePlayTrack(track.uri)}
+                className="bg-green-500 hover:bg-green-600 text-black p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                title={`Play ${track.name}`}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       ))}
