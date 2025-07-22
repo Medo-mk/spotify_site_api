@@ -1112,12 +1112,13 @@ const UserDashboard = () => {
 // Main App Component
 const SpotifyMusicHub = () => {
   const { user, loading } = useAuth();
+  const { currentTrack } = usePlayer();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: '🏠' },
     { id: 'search', name: 'Discover', icon: '🔍' },
-    { id: 'playlists', name: 'Playlists', icon: '🎵' },
+    { id: 'player', name: 'Player', icon: '🎵' },
     { id: 'analytics', name: 'Analytics', icon: '📊' }
   ];
 
@@ -1180,15 +1181,10 @@ const SpotifyMusicHub = () => {
       </nav>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className={`max-w-7xl mx-auto px-4 py-8 ${currentTrack ? 'pb-24' : ''}`}>
         {activeTab === 'dashboard' && <UserDashboard />}
         {activeTab === 'search' && <SearchSection />}
-        {activeTab === 'playlists' && (
-          <div className="text-center text-white">
-            <h2 className="text-2xl font-bold mb-4">Playlists Feature</h2>
-            <p>Detailed playlist management coming soon!</p>
-          </div>
-        )}
+        {activeTab === 'player' && <PlayerSection />}
         {activeTab === 'analytics' && (
           <div className="text-center text-white">
             <h2 className="text-2xl font-bold mb-4">Advanced Analytics</h2>
