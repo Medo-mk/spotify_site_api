@@ -916,7 +916,248 @@ const SearchSection = () => {
   );
 };
 
-// User Dashboard Component
+// Player Section Component
+const PlayerSection = () => {
+  const { accessToken } = useAuth();
+  const { 
+    currentTrack, 
+    isActive, 
+    isPaused,
+    queue,
+    position,
+    duration,
+    playTrack 
+  } = usePlayer();
+
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [userPlaylists, setUserPlaylists] = useState([]);
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchRecentlyPlayed();
+      fetchUserPlaylists();
+    }
+  }, [accessToken]);
+
+  const fetchRecentlyPlayed = async () => {
+    try {
+      const response = await fetch(`${API}/user/recently-played?limit=10&access_token=${accessToken}`);
+      const data = await response.json();
+      setRecentlyPlayed(data.items || []);
+    } catch (error) {
+      console.error('Error fetching recently played:', error);
+    }
+  };
+
+  const fetchUserPlaylists = async () => {
+    try {
+      const response = await fetch(`${API}/user/playlists?limit=10&access_token=${accessToken}`);
+      const data = await response.json();
+      setUserPlaylists(data.items || []);
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+    }
+  };
+
+  const handlePlayTrack = async (trackUri) => {
+    await playTrack(trackUri, accessToken);
+  };
+
+  const formatTime = (ms) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  if (!isActive) {
+    return (
+      <div className="text-center text-white py-12">
+        <div className="max-w-md mx-auto">
+          <svg className="w-24 h-24 mx-auto mb-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+          <h2 className="text-2xl font-bold mb-4">Web Player Not Active</h2>
+          <p className="text-gray-400 mb-6">The Spotify Web Player is not currently active. This could be because:</p>
+          <ul className="text-left text-gray-400 space-y-2 mb-6">
+            <li>• You need a Spotify Premium account</li>
+            <li>• The player is still initializing</li>
+            <li>• You need to refresh the page</li>
+          </ul>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-green-500 hover:bg-green-600 text-black font-medium px-6 py-3 rounded-lg transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Current Playing Card */}
+      {currentTrack && (
+        <div className="bg-gradient-to-r from-green-900 via-gray-900 to-green-900 p-6 rounded-xl">
+          <h2 className="text-2xl font-bold text-white mb-6">Currently Playing</h2>
+          <div className="flex items-center space-x-6">
+            <img 
+              src={currentTrack.album.images[1]?.url || currentTrack.album.images[0]?.url} 
+              alt={currentTrack.name}
+              className="w-32 h-32 rounded-xl shadow-lg object-cover"
+            />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-3xl font-bold text-white mb-2">{currentTrack.name}</h3>
+              <p className="text-xl text-green-400 mb-2">
+                {currentTrack.artists.map(a => a.name).join(', ')}
+              </p>
+              <p className="text-lg text-gray-400 mb-4">{currentTrack.album.name}</p>
+              
+              {/* Progress Info */}
+              <div className="flex items-center space-x-4 text-sm text-gray-400">
+                <span>{formatTime(position)}</span>
+                <span>/</span>
+                <span>{formatTime(duration)}</span>
+                <span>•</span>
+                <span className={`px-2 py-1 rounded ${isPaused ? 'bg-yellow-600 text-black' : 'bg-green-600 text-black'}`}>
+                  {isPaused ? 'Paused' : 'Playing'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Queue Section */}
+        <div className="bg-gray-900 p-6 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-6">Queue</h3>
+          
+          {queue.length > 1 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {queue.slice(1, 11).map((track, index) => (
+                <div 
+                  key={`queue-${track.id}-${index}`}
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer group"
+                  onClick={() => handlePlayTrack(track.uri)}
+                >
+                  <span className="text-gray-400 font-medium w-6">{index + 1}</span>
+                  <img 
+                    src={track.album.images[2]?.url || track.album.images[0]?.url} 
+                    alt={track.name}
+                    className="w-10 h-10 rounded object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate group-hover:text-green-400 transition-colors">
+                      {track.name}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {track.artists.map(a => a.name).join(', ')}
+                    </p>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-gray-400 py-8">
+              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13" />
+              </svg>
+              <p>No tracks in queue</p>
+              <p className="text-sm">Start playing music to see your queue</p>
+            </div>
+          )}
+        </div>
+
+        {/* Recently Played Section */}
+        <div className="bg-gray-900 p-6 rounded-xl">
+          <h3 className="text-xl font-bold text-white mb-6">Recently Played</h3>
+          
+          {recentlyPlayed.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {recentlyPlayed.map((item, index) => (
+                <div 
+                  key={`recent-${item.track.id}-${index}`}
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer group"
+                  onClick={() => handlePlayTrack(item.track.uri)}
+                >
+                  <img 
+                    src={item.track.album.images[2]?.url || item.track.album.images[0]?.url} 
+                    alt={item.track.name}
+                    className="w-10 h-10 rounded object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate group-hover:text-green-400 transition-colors">
+                      {item.track.name}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {item.track.artists.map(a => a.name).join(', ')}
+                    </p>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-gray-400 py-8">
+              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>No recently played tracks</p>
+              <p className="text-sm">Your listening history will appear here</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Playlists */}
+      <div className="bg-gray-900 p-6 rounded-xl">
+        <h3 className="text-xl font-bold text-white mb-6">Your Playlists</h3>
+        
+        {userPlaylists.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {userPlaylists.map((playlist) => (
+              <div key={playlist.id} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group">
+                {playlist.images[0] ? (
+                  <img 
+                    src={playlist.images[0].url} 
+                    alt={playlist.name}
+                    className="w-full h-24 object-cover rounded-lg mb-3"
+                  />
+                ) : (
+                  <div className="w-full h-24 bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                <h4 className="text-white font-medium truncate group-hover:text-green-400 transition-colors">{playlist.name}</h4>
+                <p className="text-gray-400 text-sm">{playlist.tracks.total} tracks</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-gray-400 py-8">
+            <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <p>No playlists found</p>
+            <p className="text-sm">Create playlists in Spotify to see them here</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 const UserDashboard = () => {
   const { user, accessToken } = useAuth();
   const [topTracks, setTopTracks] = useState([]);
