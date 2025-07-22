@@ -4,6 +4,26 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Spotify Web Playback SDK
+const loadSpotifySDK = () => {
+  return new Promise((resolve) => {
+    if (window.Spotify) {
+      resolve(window.Spotify);
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://sdk.scdn.co/spotify-player.js';
+    script.async = true;
+    
+    document.body.appendChild(script);
+    
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      resolve(window.Spotify);
+    };
+  });
+};
+
 // Context for managing auth state
 const AuthContext = React.createContext();
 
