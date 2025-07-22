@@ -1111,6 +1111,8 @@ const SpotifyMusicHub = () => {
 
   return (
     <div className="min-h-screen bg-black">
+      <ExpandedPlayer />
+      <BottomPlayerBar />
       {/* Navigation */}
       <nav className="bg-gray-900 border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4">
