@@ -1440,11 +1440,9 @@ const SpotifyMusicHub = () => {
 // Main App with Auth Provider
 function App() {
   return (
-    <PlayerProvider>
-      <AuthProvider>
-        <SpotifyMusicHub />
-      </AuthProvider>
-    </PlayerProvider>
+    <AuthProvider>
+      <SpotifyMusicHub />
+    </AuthProvider>
   );
 }
 
